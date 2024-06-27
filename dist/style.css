@@ -1,0 +1,119 @@
+html{
+    font-size: 62.5%;
+}
+
+*{
+    font-family: inherit;
+    box-sizing: border-box;
+    padding: 0;
+    margin: 0;
+}
+
+body{
+    width: 100vw;
+    height: 100vh;
+    background-color: rgb(255, 255, 255);
+}
+
+#container{
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: row;
+    flex-wrap: nowrap;
+}
+
+#tool-container{
+    position: absolute;
+    
+    background-color:rgb(255, 255, 255);
+    box-shadow: 1px 1px 1px rgba(0, 0, 0, 0.2);
+    border-radius: 10px;
+    border: 1px solid rgb(240, 240, 240);
+    margin: 10px;
+    z-index: 1;
+
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    flex-wrap: nowrap;
+    height: fit-content;
+    width: fit-content;
+    padding: 10px;
+    gap: 10px
+}
+
+#tool-container *{
+    user-select: none;
+}
+
+.tool-popup{
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding: 10px;
+    position: absolute;
+    top: 0;
+    left: calc(37px + 20px + 10px);
+    width: fit-content;
+    height: fit-content;
+    font-size: 1.2rem;
+
+    background-color:rgb(255, 255, 255);
+    box-shadow: 1px 1px 1px rgba(0, 0, 0, 0.2);
+    border-radius: 10px;
+    border: 1px solid rgb(240, 240, 240);
+}
+
+.tool-popup span{
+    display: flex;
+    flex-direction: row;
+    justify-content: center;
+    align-items: center;
+}
+
+#thickness-number{
+    text-align: end;
+    width: 1.2rem;
+    height: fit-content;
+    user-select: none;
+}
+
+.tool-popup input[type="color"]{
+    all:unset;
+    flex-grow: 1;
+    height: 30px;
+    appearance: none;
+    padding: 0;
+    border: none;
+    outline: none;
+}
+
+.tool-button{
+    width: 37px;
+    height: 37px;
+    border-radius: 10px;
+    display: grid;
+    place-content: center;
+    overflow: hidden;
+}
+
+.tool-button:hover{
+    background-color: rgba(0, 0, 0, 0.178);
+    cursor: pointer;
+}
+
+.tool-button[active]{
+    background-color: crimson;
+}
+
+.tool-button img{
+    margin: 0 auto;
+    width: 70%;
+}
+
+#whiteboard{  
+  width: 100%;
+  height: 100%;
+  background-color: rgb(242, 252, 252);
+}
