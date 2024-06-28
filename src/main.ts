@@ -2,6 +2,14 @@ interface IDrawing{
     points:{x:number, y:number}[];
     color: string;
     lineWidth:number;
+    selected: boolean
+}
+
+interface ISelectionArea{
+    start: {x: number, y: number};
+    end: {x: number, y: number};
+    color: string;
+    lineWidth: number;
 }
 
 interface IToolButton {
@@ -13,12 +21,12 @@ interface IToolButton {
     element?: HTMLElement;
 }
 
-class Variable{
-    private _value: string | number | null = null;
+class Variable<T>{
+    private _value: T;
     private associates: HTMLElement [] = [];
     private listeners: Function[] = [];
 
-    constructor(value:number | string){
+    constructor(value:T){
         this._value = value;
     }
 
@@ -26,10 +34,10 @@ class Variable{
         this.associates.push(element);
         if(element.tagName.toLowerCase() === "input"){
             element.addEventListener("input", (event:Event) => {
-                this.value = (event.target as HTMLInputElement).value;
+                this.value = (event.target as HTMLInputElement).value as T;
             })
         };
-        this.value = this._value as number | string;
+        this.value = this._value as T;
     }
 
     public addListener(func:Function){
@@ -37,18 +45,18 @@ class Variable{
         func(this._value);
     }
 
-    get value():number | string | null{
+    get value():T{
         return this._value
     }
 
-    set value(value:string | number){
+    set value(value:T){
         this._value = value;
         if(this.associates.length > 0){
             for(let element of this.associates){
                 if(element.tagName.toLowerCase() === "input"){
-                    (element as HTMLInputElement).value = value.toString();
+                    (element as HTMLInputElement).value = value as string;
                 }else{
-                    (element as HTMLElement).textContent = value.toString();
+                    (element as HTMLElement).textContent = value as string;
                 }
             }
         }
@@ -67,13 +75,17 @@ enum ETools {
     Eraser = "eraser", 
     Cursor = "cursor", 
     Hand = "hand",
+    Center = "center",
 }
 
 class SharedVariables{
     public actualTool: ETools | null = null;
-    public lineThickness: Variable = new Variable(10);
-    public lineColor: Variable = new Variable("#FFBB00");
-    public eraserThickness: Variable = new Variable(10);
+    public lineThickness: Variable<number> = new Variable<number>(2);
+    public lineColor: Variable<string> = new Variable<string>("#38316d");
+    public eraserThickness: Variable<number> = new Variable<number>(10);
+    public selectedColor: string = "rgba(255, 0, 0, 1)";
+    public selectionLineColor: string = "darkcyan";
+    public selectionLineWidth: number = 2;
 }
 
 abstract class PopUp{
@@ -250,7 +262,8 @@ class ToolBar{
     private eraserButton = new ToolBarButton(this.toolContainer,"eraser-button", "./images/eraser-ico.svg", this.selectEraser);
     private cursorButton = new ToolBarButton(this.toolContainer,"cursor-button", "./images/cursor-ico.svg", this.selectCursor);
     private handButton = new ToolBarButton(this.toolContainer,"hand-button", "./images/hand-ico.svg", this.selectHand);
-    private buttons: ToolBarButton[] = [this.penButton, /*this.addButton,*/ this.eraserButton, this.cursorButton, this.handButton ]
+    private centerButton = new ToolBarButton(this.toolContainer,"center-button", "./images/center-focus-ico.svg", this.selectHand);
+    private buttons: ToolBarButton[] = [this.penButton, /*this.addButton,*/ this.eraserButton, this.cursorButton, this.handButton, this.centerButton]
 
     private penPopUp:PenPopUp | null = null;
     private addPopUp:AddPopUp | null = null;
@@ -363,6 +376,9 @@ class ToolBar{
     selectHand():void{
         this.dispatchToolChangeEvent(ETools.Hand);
     }
+    selectCenter():void{
+        this.dispatchToolChangeEvent(ETools.Center);
+    }
 }
 
 abstract class Tool{
@@ -385,7 +401,8 @@ class Pen extends Tool{
             this.whiteboard.currentDrawing = {
                 points:[{x, y}],
                 color: this.whiteboard.sharedVariables.lineColor.value as string,
-                lineWidth: this.whiteboard.sharedVariables.lineThickness.value as number
+                lineWidth: this.whiteboard.sharedVariables.lineThickness.value as number,
+                selected: false
             }
             this.whiteboard.lastX = x;
             this.whiteboard.lastY = y;
@@ -410,7 +427,7 @@ class Pen extends Tool{
         }
     }
 
-    public finishDrawing(){
+    public finishDrawing(event:MouseEvent){
         if(this.whiteboard.currentDrawing){
             this.whiteboard.drawings.push(this.whiteboard.currentDrawing);
             this.whiteboard.currentDrawing = null;
@@ -429,15 +446,21 @@ class Eraser extends Tool{
     }
     
     public startErasing(event: MouseEvent) {
-        this.erasing = true;
-        let radius: number = 10;
-        let x = event.offsetX - this.whiteboard.getCurrentTranslateX();
-        let y = event.offsetY - this.whiteboard.getCurrentTranslateY();
-
         if (!this.whiteboard.currentDrawing) {
+
+            let radius: number = 10;
+            let x = event.offsetX - this.whiteboard.getCurrentTranslateX();
+            let y = event.offsetY - this.whiteboard.getCurrentTranslateY();
+            
+            this.erasing = true;
+
             this.whiteboard.drawings = this.whiteboard.drawings.filter((draw) => {
                 return !this.isDrawingInEraseRadius(draw, x, y, radius);
             });
+
+            this.whiteboard.drawings.forEach((draw, index) => {
+
+            })
             this.whiteboard.redraw();
         }
     }
@@ -487,9 +510,129 @@ class Eraser extends Tool{
         }
     }
 
-    public finishErasing(){
+    public finishErasing(event:MouseEvent){
         if(this.erasing){
             this.erasing = false;
+        }
+    }
+}
+
+class Cursor extends Tool{
+
+    public selecting:boolean = false;
+
+    constructor(whiteboard:WhiteBoard){
+        super(whiteboard);
+    }
+
+    public startSelection(event: MouseEvent) {
+        if (!this.whiteboard.currentDrawing) {
+            this.selecting = true;
+        }
+    }
+
+    private isDrawingInEraseRadius(drawing: IDrawing, x: number, y: number, radius: number): boolean {
+        for (let i = 0; i < drawing.points.length - 1; i++) {
+            let point1 = drawing.points[i];
+            let point2 = drawing.points[i + 1];
+            if (this.isPointNearLine(drawing.lineWidth, point1, point2, { x, y }, radius)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private isPointNearLine(lineWidth:number, point1: { x: number, y: number }, point2: { x: number, y: number }, point: { x: number, y: number }, radius: number): boolean {
+        let A = point.x - point1.x;
+        let B = point.y - point1.y;
+        let C = point2.x - point1.x;
+        let D = point2.y - point1.y;
+
+        let dot = A * C + B * D;
+        let len_sq = C * C + D * D;
+        let param = dot / len_sq;
+
+        let xx, yy;
+
+        if (param < 0) {
+            xx = point1.x;
+            yy = point1.y;
+        } else if (param > 1) {
+            xx = point2.x;
+            yy = point2.y;
+        } else {
+            xx = point1.x + param * C;
+            yy = point1.y + param * D;
+        }
+
+        let dx = point.x - xx;
+        let dy = point.y - yy;
+        return Math.sqrt(dx * dx + dy * dy) <= (lineWidth/2) + ((this.whiteboard.sharedVariables.eraserThickness.value as number) / 2);
+    }
+
+    public continueSelection(event:MouseEvent){
+        if(this.selecting){
+            let x = event.offsetX - this.whiteboard.getCurrentTranslateX();
+            let y = event.offsetY - this.whiteboard.getCurrentTranslateY();
+            if(!this.whiteboard.currentSelectionArea){
+                this.whiteboard.currentSelectionArea = {
+                    start: {x, y},
+                    color: this.whiteboard.sharedVariables.selectionLineColor,
+                    end: {x, y},
+                    lineWidth: this.whiteboard.sharedVariables.selectionLineWidth
+                };
+            }else{
+                this.whiteboard.currentSelectionArea.end = {x, y}
+            }
+            this.whiteboard.redraw();
+        }
+    }
+
+    public finishSelection(event:MouseEvent){
+        if(this.selecting){
+            this.selecting = false;
+
+            if(this.whiteboard.currentSelectionArea){
+                this.whiteboard.currentSelectionArea = null;
+            }else{
+                let x = event.offsetX - this.whiteboard.getCurrentTranslateX();
+                let y = event.offsetY - this.whiteboard.getCurrentTranslateY();
+
+                this.whiteboard.drawings.forEach((draw) => {
+                    if(this.isDrawingInEraseRadius(draw, x, y, 1)){
+                        draw.selected = true;
+                    }else{
+                        draw.selected = false;
+                    };
+                });
+            }
+            this.whiteboard.redraw();
+        }
+    }
+}
+
+class Hand extends Tool{
+
+    public dragging:boolean = false;
+
+    constructor(whiteboard: WhiteBoard){
+        super(whiteboard);
+    }
+
+    public startDragging(event:MouseEvent){
+        this.dragging = true;
+        let x = event.offsetX - this.whiteboard.getCurrentTranslateX();
+        let y = event.offsetY - this.whiteboard.getCurrentTranslateY();
+        console.log('started to dragging');
+    }
+
+    public continueDragging(event:MouseEvent){
+
+    }
+
+    public finishDragging(event:MouseEvent){
+        if(this.dragging){
+            this.dragging = false;
         }
     }
 }
@@ -498,18 +641,27 @@ class WhiteBoard{
 
     private pen:Pen = new Pen(this);
     private eraser:Eraser = new Eraser(this);
+    private cursor:Cursor = new Cursor(this);
+    private hand:Hand = new Hand(this);
 
+    public sharedVariables:SharedVariables;
     public drawings: IDrawing[] = [];
     private redoDrawings: IDrawing[] = [];
     public currentDrawing: IDrawing | null = null;
-    private canvas : HTMLCanvasElement ;
+    public currentSelectionArea: ISelectionArea | null = {
+        start: {x: 100, y:100},
+        color: "darkcyan",
+        end: {x: 400, y: 400},
+        lineWidth: 2
+    };
+
+    private canvas : HTMLCanvasElement = document.getElementById("whiteboard") as HTMLCanvasElement;
     private ctx:CanvasRenderingContext2D;
+
     public lastX: number | null = null;
     public lastY: number | null = null;
-    public sharedVariables:SharedVariables;
 
     constructor(sharedVariables:SharedVariables){
-        this.canvas = document.getElementById("whiteboard") as HTMLCanvasElement;
         this.ctx = this.canvas.getContext('2d') as CanvasRenderingContext2D;
         this.sharedVariables = sharedVariables;
         this.resizeCanvas();
@@ -533,6 +685,12 @@ class WhiteBoard{
         else if(this.sharedVariables.actualTool === ETools.Eraser){
             this.eraser.startErasing.bind(this.eraser)(event);
         }
+        else if(this.sharedVariables.actualTool === ETools.Cursor){
+            this.cursor.startSelection.bind(this.cursor)(event);
+        }
+        else if(this.sharedVariables.actualTool === ETools.Hand){
+            this.hand.startDragging.bind(this.hand)(event);
+        }
     }
 
     private mouseMoveEventListener(event:MouseEvent):void{
@@ -542,23 +700,42 @@ class WhiteBoard{
         else if(this.sharedVariables.actualTool === ETools.Eraser){
             this.eraser.continueErasing.bind(this.eraser)(event);
         }
+        else if(this.sharedVariables.actualTool === ETools.Cursor){
+            this.cursor.continueSelection.bind(this.cursor)(event);
+        }
+        else if(this.sharedVariables.actualTool === ETools.Hand){
+            this.hand.continueDragging.bind(this.hand)(event);
+        }
     }
 
     private mouseUpEventListener(event:MouseEvent):void{
         if(this.sharedVariables.actualTool === ETools.Pen){
-            this.pen.finishDrawing.bind(this.pen)();
+            this.pen.finishDrawing.bind(this.pen)(event);
         }
         else if(this.sharedVariables.actualTool === ETools.Eraser){
-            this.eraser.finishErasing.bind(this.eraser)();
+            this.eraser.finishErasing.bind(this.eraser)(event);
         }
+        else if(this.sharedVariables.actualTool === ETools.Cursor){
+            this.cursor.finishSelection.bind(this.cursor)(event);
+        }
+        else if(this.sharedVariables.actualTool === ETools.Hand){
+            this.hand.finishDragging.bind(this.hand)(event);
+        }
+        
     }
 
     private mouseLeaveEventListener(event:MouseEvent):void{
         if(this.sharedVariables.actualTool === ETools.Pen){
-            this.pen.finishDrawing.bind(this.pen)();
+            this.pen.finishDrawing.bind(this.pen)(event);
         }
         else if(this.sharedVariables.actualTool === ETools.Eraser){
-            this.eraser.finishErasing.bind(this.eraser)();
+            this.eraser.finishErasing.bind(this.eraser)(event);
+        }
+        else if(this.sharedVariables.actualTool === ETools.Cursor){
+            this.cursor.finishSelection.bind(this.cursor)(event);
+        }
+        else if(this.sharedVariables.actualTool === ETools.Hand){
+            this.hand.finishDragging.bind(this.hand)(event);
         }
     }
     
@@ -657,15 +834,37 @@ class WhiteBoard{
         this.ctx.clearRect(x,y, this.canvas.width, this.canvas.height);
 
         this.drawings.forEach(drawing => {
-            this.drawSmoothLine(drawing.points, drawing.color, drawing.lineWidth);
+            this.drawSmoothLine(drawing.points, drawing.color, drawing.lineWidth, drawing.selected);
         });
 
-        if (this.currentDrawing) {
-            this.drawSmoothLine(this.currentDrawing.points, this.currentDrawing.color, this.currentDrawing.lineWidth);
+        let currentD = this.currentDrawing;
+        if (currentD) {
+            this.drawSmoothLine(currentD.points, currentD.color, currentD.lineWidth, currentD.selected);
+        }
+
+
+        let currentSA = this.currentSelectionArea;
+        if(currentSA){
+            this.drawSelectionArea(currentSA.start, currentSA.end, currentSA.color, currentSA.lineWidth);
         }
     }
 
-    private drawSmoothLine(points: { x: number, y: number}[], color: string, lineWidth: number) {
+    private drawSelectionArea(start: { x: number, y: number}, end: { x: number, y: number}, color: string, lineWidth: number){
+        this.ctx.strokeStyle = color;
+        this.ctx.lineWidth = lineWidth;
+        this.ctx.beginPath();
+        this.ctx.moveTo(start.x, start.y);
+
+        let width = end.x - start.x
+        let height = end.y - start.y
+
+        this.ctx.rect(start.x, start.y, width, height)
+
+        this.ctx.stroke();
+
+    }
+
+    private drawSmoothLine(points: { x: number, y: number}[], color: string, lineWidth: number, selected: boolean) {
         if (points.length < 2) {
             return; // Não é possível desenhar uma linha com menos de 2 pontos
         }
@@ -681,10 +880,19 @@ class WhiteBoard{
             this.ctx.quadraticCurveTo(points[i].x, points[i].y, xc, yc);
         }
 
+        //Testando a sombra de seleção.
+        if(selected){
+            this.ctx.shadowColor = this.sharedVariables.selectedColor;
+            this.ctx.shadowBlur = 5;
+            this.ctx.shadowOffsetX = 0;
+            this.ctx.shadowOffsetY = 0;
+        }
+
         // Últimos pontos
         const last = points.length - 1;
         this.ctx.quadraticCurveTo(points[last - 1].x, points[last - 1].y, points[last].x, points[last].y);
         this.ctx.stroke();
+        this.ctx.shadowColor = 'transparent';
     }
 
     private resizeCanvas ():void{
@@ -699,6 +907,5 @@ document.addEventListener("DOMContentLoaded", (e:Event) => {
     const sharedVariables = new SharedVariables();
     const whiteboard = new WhiteBoard(sharedVariables);
     const toolBar = new ToolBar(sharedVariables);
-    
 })
 
