@@ -58,7 +58,8 @@ class SharedVariables {
         this.eraserThickness = new Variable(10);
         this.selectedColor = "rgba(255, 0, 0, 1)";
         this.selectionLineColor = "darkcyan";
-        this.selectionLineWidth = 2;
+        this.selectionFillColor = "rgba(222,222,222,0.3)";
+        this.selectionLineWidth = 0.5;
     }
 }
 class PopUp {
@@ -347,14 +348,12 @@ class Eraser extends Tool {
     }
     startErasing(event) {
         if (!this.whiteboard.currentDrawing) {
+            this.erasing = true;
             let radius = 10;
             let x = event.offsetX - this.whiteboard.getCurrentTranslateX();
             let y = event.offsetY - this.whiteboard.getCurrentTranslateY();
-            this.erasing = true;
             this.whiteboard.drawings = this.whiteboard.drawings.filter((draw) => {
                 return !this.isDrawingInEraseRadius(draw, x, y, radius);
-            });
-            this.whiteboard.drawings.forEach((draw, index) => {
             });
             this.whiteboard.redraw();
         }
@@ -450,6 +449,18 @@ class Cursor extends Tool {
         let dy = point.y - yy;
         return Math.sqrt(dx * dx + dy * dy) <= (lineWidth / 2) + (this.whiteboard.sharedVariables.eraserThickness.value / 2);
     }
+    isPointInSelectionArea(points, selectionArea) {
+        let minX = Math.min(selectionArea.start.x, selectionArea.end.x);
+        let maxX = Math.max(selectionArea.start.x, selectionArea.end.x);
+        let minY = Math.min(selectionArea.start.y, selectionArea.end.y);
+        let maxY = Math.max(selectionArea.start.y, selectionArea.end.y);
+        for (let point of points) {
+            if (point.x >= minX && point.x <= maxX && point.y >= minY && point.y <= maxY) {
+                return true;
+            }
+        }
+        return false;
+    }
     continueSelection(event) {
         if (this.selecting) {
             let x = event.offsetX - this.whiteboard.getCurrentTranslateX();
@@ -463,6 +474,9 @@ class Cursor extends Tool {
                 };
             }
             else {
+                this.whiteboard.drawings.forEach((draw) => {
+                    draw.selected = this.isPointInSelectionArea(draw.points, this.whiteboard.currentSelectionArea);
+                });
                 this.whiteboard.currentSelectionArea.end = { x, y };
             }
             this.whiteboard.redraw();
@@ -519,12 +533,7 @@ class WhiteBoard {
         this.drawings = [];
         this.redoDrawings = [];
         this.currentDrawing = null;
-        this.currentSelectionArea = {
-            start: { x: 100, y: 100 },
-            color: "darkcyan",
-            end: { x: 400, y: 400 },
-            lineWidth: 2
-        };
+        this.currentSelectionArea = null;
         this.canvas = document.getElementById("whiteboard");
         this.lastX = null;
         this.lastY = null;
@@ -667,6 +676,13 @@ class WhiteBoard {
             this.setAbsoluteTranslate(0, 0);
             this.redraw();
         }
+        else if (key === "delete") {
+            this.drawings = this.drawings.filter((draw) => {
+                return draw.selected == false;
+            });
+            this.redraw();
+            console.log('acho que foi');
+        }
     }
     setAbsoluteTranslate(x, y) {
         let currentTranslateX = this.getCurrentTranslateX();
@@ -705,6 +721,8 @@ class WhiteBoard {
         let width = end.x - start.x;
         let height = end.y - start.y;
         this.ctx.rect(start.x, start.y, width, height);
+        this.ctx.fillStyle = this.sharedVariables.selectionFillColor;
+        this.ctx.fill();
         this.ctx.stroke();
     }
     drawSmoothLine(points, color, lineWidth, selected) {

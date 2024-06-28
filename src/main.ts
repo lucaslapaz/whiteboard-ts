@@ -85,7 +85,8 @@ class SharedVariables{
     public eraserThickness: Variable<number> = new Variable<number>(10);
     public selectedColor: string = "rgba(255, 0, 0, 1)";
     public selectionLineColor: string = "darkcyan";
-    public selectionLineWidth: number = 2;
+    public selectionFillColor: string = "rgba(222,222,222,0.3)"
+    public selectionLineWidth: number = 0.5;
 }
 
 abstract class PopUp{
@@ -447,20 +448,13 @@ class Eraser extends Tool{
     
     public startErasing(event: MouseEvent) {
         if (!this.whiteboard.currentDrawing) {
-
+            this.erasing = true;
             let radius: number = 10;
             let x = event.offsetX - this.whiteboard.getCurrentTranslateX();
             let y = event.offsetY - this.whiteboard.getCurrentTranslateY();
-            
-            this.erasing = true;
-
             this.whiteboard.drawings = this.whiteboard.drawings.filter((draw) => {
                 return !this.isDrawingInEraseRadius(draw, x, y, radius);
             });
-
-            this.whiteboard.drawings.forEach((draw, index) => {
-
-            })
             this.whiteboard.redraw();
         }
     }
@@ -570,6 +564,21 @@ class Cursor extends Tool{
         return Math.sqrt(dx * dx + dy * dy) <= (lineWidth/2) + ((this.whiteboard.sharedVariables.eraserThickness.value as number) / 2);
     }
 
+    private isPointInSelectionArea(points: { x: number, y: number }[], selectionArea:ISelectionArea):boolean{
+
+        let minX = Math.min(selectionArea.start.x, selectionArea.end.x);
+        let maxX = Math.max(selectionArea.start.x, selectionArea.end.x);
+        let minY = Math.min(selectionArea.start.y, selectionArea.end.y);
+        let maxY = Math.max(selectionArea.start.y, selectionArea.end.y);
+
+        for(let point of points){
+            if(point.x >= minX && point.x <= maxX && point.y >= minY && point.y <= maxY){
+                return true;
+            }
+        }
+        return false;
+    }
+
     public continueSelection(event:MouseEvent){
         if(this.selecting){
             let x = event.offsetX - this.whiteboard.getCurrentTranslateX();
@@ -582,6 +591,10 @@ class Cursor extends Tool{
                     lineWidth: this.whiteboard.sharedVariables.selectionLineWidth
                 };
             }else{
+                
+                this.whiteboard.drawings.forEach((draw) => {
+                    draw.selected = this.isPointInSelectionArea(draw.points, this.whiteboard.currentSelectionArea as ISelectionArea)
+                })
                 this.whiteboard.currentSelectionArea.end = {x, y}
             }
             this.whiteboard.redraw();
@@ -594,6 +607,7 @@ class Cursor extends Tool{
 
             if(this.whiteboard.currentSelectionArea){
                 this.whiteboard.currentSelectionArea = null;
+
             }else{
                 let x = event.offsetX - this.whiteboard.getCurrentTranslateX();
                 let y = event.offsetY - this.whiteboard.getCurrentTranslateY();
@@ -648,12 +662,7 @@ class WhiteBoard{
     public drawings: IDrawing[] = [];
     private redoDrawings: IDrawing[] = [];
     public currentDrawing: IDrawing | null = null;
-    public currentSelectionArea: ISelectionArea | null = {
-        start: {x: 100, y:100},
-        color: "darkcyan",
-        end: {x: 400, y: 400},
-        lineWidth: 2
-    };
+    public currentSelectionArea: ISelectionArea | null = null;
 
     private canvas : HTMLCanvasElement = document.getElementById("whiteboard") as HTMLCanvasElement;
     private ctx:CanvasRenderingContext2D;
@@ -809,6 +818,12 @@ class WhiteBoard{
             }
             this.setAbsoluteTranslate(0, 0);
             this.redraw();
+        }else if(key === "delete"){
+            this.drawings = this.drawings.filter((draw)=> {
+                return draw.selected == false
+            })
+            this.redraw();
+            console.log('acho que foi');
         }
     }
 
@@ -859,6 +874,8 @@ class WhiteBoard{
         let height = end.y - start.y
 
         this.ctx.rect(start.x, start.y, width, height)
+        this.ctx.fillStyle = this.sharedVariables.selectionFillColor;
+        this.ctx.fill();
 
         this.ctx.stroke();
 
