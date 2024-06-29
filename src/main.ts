@@ -175,7 +175,6 @@ class EraserPopUp extends PopUp{
     }
 
     createInterface(): void{
-        console.log('ljsadkfjasdkfj')
         this.interface.classList.add("tool-popup");
         this.thicknessRange.setAttribute("id", "thickness-range");
         this.thicknessRange.setAttribute("type", "range");
@@ -591,7 +590,6 @@ class Cursor extends Tool{
                     lineWidth: this.whiteboard.sharedVariables.selectionLineWidth
                 };
             }else{
-                
                 this.whiteboard.drawings.forEach((draw) => {
                     draw.selected = this.isPointInSelectionArea(draw.points, this.whiteboard.currentSelectionArea as ISelectionArea)
                 })
@@ -627,6 +625,7 @@ class Cursor extends Tool{
 
 class Hand extends Tool{
 
+    public initialPoint: {x: number, y: number} | null = null;
     public dragging:boolean = false;
 
     constructor(whiteboard: WhiteBoard){
@@ -635,18 +634,29 @@ class Hand extends Tool{
 
     public startDragging(event:MouseEvent){
         this.dragging = true;
-        let x = event.offsetX - this.whiteboard.getCurrentTranslateX();
-        let y = event.offsetY - this.whiteboard.getCurrentTranslateY();
-        console.log('started to dragging');
+        let x = event.offsetX;
+        let y = event.offsetY;
+        this.initialPoint = {x, y}
     }
 
     public continueDragging(event:MouseEvent){
+        if(this.dragging && this.initialPoint){
+            let x = event.offsetX;
+            let y = event.offsetY;
+            let diffX = x - this.initialPoint.x;
+            let diffY = y - this.initialPoint.y;
 
+            this.whiteboard.ctx.translate(diffX, diffY);
+            this.initialPoint = {x, y}
+            this.whiteboard.redraw();
+        }
     }
 
     public finishDragging(event:MouseEvent){
         if(this.dragging){
             this.dragging = false;
+            this.initialPoint = null;
+            this.whiteboard.redraw();
         }
     }
 }
@@ -659,13 +669,28 @@ class WhiteBoard{
     private hand:Hand = new Hand(this);
 
     public sharedVariables:SharedVariables;
-    public drawings: IDrawing[] = [];
-    private redoDrawings: IDrawing[] = [];
+    public drawings: IDrawing[] = [{
+        points: [{x: 200, y:100}, {x: 200, y: 710}],
+        color: "darkcyan",
+        lineWidth: 4,
+        selected: false
+    },{
+        points: [{x: 300, y:100}, {x: 300, y: 710}],
+        color: "darkred",
+        lineWidth: 4,
+        selected: false
+    },{
+        points: [{x: 500, y:100}, {x: 500, y: 200},{x: 600, y:200}, {x: 600, y: 100}, {x: 500, y:100},{x: 500, y: 200}],
+        color: "darkblue",
+        lineWidth: 4,
+        selected: false
+    }];
+    public redoDrawings: IDrawing[] = [];
     public currentDrawing: IDrawing | null = null;
     public currentSelectionArea: ISelectionArea | null = null;
 
     private canvas : HTMLCanvasElement = document.getElementById("whiteboard") as HTMLCanvasElement;
-    private ctx:CanvasRenderingContext2D;
+    public ctx:CanvasRenderingContext2D;
 
     public lastX: number | null = null;
     public lastY: number | null = null;
@@ -827,7 +852,7 @@ class WhiteBoard{
         }
     }
 
-    private setAbsoluteTranslate(x:number, y:number):void{
+    public setAbsoluteTranslate(x:number, y:number):void{
         let currentTranslateX = this.getCurrentTranslateX();
         let currentTranslateY = this.getCurrentTranslateY();
         let deltaX = x - currentTranslateX;
@@ -925,4 +950,3 @@ document.addEventListener("DOMContentLoaded", (e:Event) => {
     const whiteboard = new WhiteBoard(sharedVariables);
     const toolBar = new ToolBar(sharedVariables);
 })
-
