@@ -1,0 +1,59 @@
+/*
+ * Paleta e medidas do projeto. O canvas le algumas destas variaveis em tempo
+ * de execucao (ver Renderer.readTheme), entao trocar a cor aqui muda o desenho
+ * e a interface de uma vez so.
+ */
+
+:root {
+    color-scheme: light;
+
+    /* Superficie do quadro */
+    --board-bg: #f4f8f9;
+    --board-grid: rgba(56, 49, 109, 0.16);
+    --brush-outline: rgba(56, 49, 109, 0.5);
+    --selection-stroke: #0e7490;
+    --selection-fill: rgba(14, 116, 144, 0.1);
+    --selection-glow: #e11d48;
+
+    /* Interface */
+    --accent: #38316d;
+    --accent-soft: rgba(56, 49, 109, 0.1);
+    --accent-contrast: #ffffff;
+    --surface: rgba(255, 255, 255, 0.86);
+    --surface-solid: #ffffff;
+    --surface-hover: rgba(56, 49, 109, 0.08);
+    --border: rgba(20, 24, 40, 0.1);
+    --text: #1d2233;
+    --text-muted: #626a82;
+    --shadow: 0 10px 30px -12px rgba(16, 20, 40, 0.35), 0 2px 6px -2px rgba(16, 20, 40, 0.15);
+
+    /* Medidas */
+    --radius-sm: 10px;
+    --radius-md: 14px;
+    --radius-lg: 18px;
+    --space: 10px;
+    --button-size: 40px;
+    --toolbar-width: calc(var(--button-size) + 2 * var(--space) + 2px);
+}
+
+:root[data-theme="dark"] {
+    color-scheme: dark;
+
+    --board-bg: #14161f;
+    --board-grid: rgba(198, 206, 255, 0.14);
+    --brush-outline: rgba(214, 220, 255, 0.55);
+    --selection-stroke: #22d3ee;
+    --selection-fill: rgba(34, 211, 238, 0.12);
+    --selection-glow: #fb7185;
+
+    --accent: #8b83ff;
+    --accent-soft: rgba(139, 131, 255, 0.16);
+    --accent-contrast: #15131f;
+    --surface: rgba(30, 33, 45, 0.88);
+    --surface-solid: #1e212d;
+    --surface-hover: rgba(214, 220, 255, 0.09);
+    --border: rgba(214, 220, 255, 0.12);
+    --text: #e7e9f3;
+    --text-muted: #9aa1bb;
+    --shadow: 0 12px 34px -14px rgba(0, 0, 0, 0.8), 0 2px 6px -2px rgba(0, 0, 0, 0.5);
+}

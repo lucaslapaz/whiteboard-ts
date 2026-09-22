@@ -1,17 +1,27 @@
 {
   "name": "whiteboard",
   "version": "1.0.0",
-  "main": "main.js",
   "scripts": {
-    "start": "nodemon --watch ./src --ext ts --exec tsc",
-    "start1": "nodemon --watch ./main.ts --exec tsc ./main.ts --target es2016"
+    "start": "vite",
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:e2e": "playwright test"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
-  "description": "",
+  "description": "Um quadro branco infinito para desenhar no navegador, em TypeScript puro.",
   "devDependencies": {
-    "nodemon": "^3.1.4",
-    "typescript": "^5.5.2"
-  }
+    "@playwright/test": "^1.63.0",
+    "@types/node": "^26.6.2",
+    "jsdom": "^29.1.1",
+    "typescript": "^5.9.3",
+    "vite": "^8.3.0",
+    "vitest": "^5.0.1"
+  },
+  "type": "module"
 }

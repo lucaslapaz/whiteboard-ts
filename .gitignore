@@ -1,5 +1,11 @@
 # dependencies
 /node_modules
 
+# build
+/dist
 
-
+# testes
+/test-results
+/playwright-report
+/blob-report
+/playwright/.cache

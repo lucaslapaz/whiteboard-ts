@@ -1,0 +1,446 @@
+html {
+    font-size: 62.5%;
+}
+
+*,
+*::before,
+*::after {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+body {
+    width: 100vw;
+    height: 100dvh;
+    overflow: hidden;
+    color: var(--text);
+    background-color: var(--board-bg);
+    font-family: "Inter", "Segoe UI", system-ui, -apple-system, sans-serif;
+    font-size: 1.4rem;
+    -webkit-font-smoothing: antialiased;
+}
+
+#container {
+    position: relative;
+    width: 100%;
+    height: 100%;
+}
+
+/* ---------------------------------------------------------------- Quadro */
+
+#whiteboard {
+    display: block;
+    width: 100%;
+    height: 100%;
+    background-color: var(--board-bg);
+    touch-action: none;
+    cursor: crosshair;
+}
+
+/*
+ * Caneta e borracha escondem o cursor do sistema: no lugar dele o proprio canvas
+ * desenha um circulo do tamanho exato do traco, logo abaixo da ponta. Assim nada
+ * fica na frente do que esta sendo desenhado.
+ */
+#whiteboard[data-tool="pen"],
+#whiteboard[data-tool="eraser"] {
+    cursor: none;
+}
+
+#whiteboard[data-tool="cursor"] {
+    cursor: default;
+}
+
+#whiteboard[data-tool="hand"] {
+    cursor: grab;
+}
+
+#whiteboard[data-tool="hand"]:active {
+    cursor: grabbing;
+}
+
+/* ------------------------------------------------------------ Ferramentas */
+
+#tool-container {
+    position: absolute;
+    top: 16px;
+    left: 16px;
+    z-index: 2;
+
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+
+    width: var(--toolbar-width);
+    padding: var(--space);
+
+    background-color: var(--surface);
+    backdrop-filter: blur(14px);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow);
+}
+
+#tool-container * {
+    user-select: none;
+}
+
+.tool-divider {
+    width: 60%;
+    height: 1px;
+    margin: 4px 0;
+    background-color: var(--border);
+}
+
+.tool-button {
+    position: relative;
+    display: grid;
+    place-content: center;
+    width: var(--button-size);
+    height: var(--button-size);
+    color: var(--text-muted);
+    background: transparent;
+    border: none;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    transition:
+        background-color 0.15s ease,
+        color 0.15s ease,
+        transform 0.1s ease;
+}
+
+.tool-button:hover {
+    color: var(--text);
+    background-color: var(--surface-hover);
+}
+
+.tool-button:active {
+    transform: scale(0.94);
+}
+
+.tool-button:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+}
+
+.tool-button[active] {
+    color: var(--accent-contrast);
+    background-color: var(--accent);
+}
+
+.tool-icon {
+    display: block;
+    width: 20px;
+    height: 20px;
+}
+
+.tool-icon svg {
+    display: block;
+    width: 100%;
+    height: 100%;
+}
+
+/* Dica que aparece ao lado do botao. */
+.tool-button::after {
+    content: attr(data-hint);
+    position: absolute;
+    left: calc(100% + 12px);
+    top: 50%;
+    transform: translateY(-50%);
+
+    padding: 5px 9px;
+    font-size: 1.2rem;
+    white-space: nowrap;
+    color: var(--text);
+    background-color: var(--surface-solid);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    box-shadow: var(--shadow);
+
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.12s ease;
+}
+
+.tool-button:hover::after {
+    opacity: 1;
+    transition-delay: 0.35s;
+}
+
+/* ----------------------------------------------------------------- Popup */
+
+.tool-popup {
+    position: absolute;
+    top: 0;
+    left: calc(var(--toolbar-width) + 12px);
+    z-index: 3;
+
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    width: 220px;
+    padding: 14px;
+
+    background-color: var(--surface-solid);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow);
+    animation: popup-in 0.14s ease-out;
+}
+
+@keyframes popup-in {
+    from {
+        opacity: 0;
+        transform: translateX(-6px);
+    }
+}
+
+.popup-field {
+    display: flex;
+    flex-direction: column;
+    gap: 7px;
+}
+
+.popup-label {
+    font-size: 1.1rem;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+}
+
+.popup-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.popup-value {
+    min-width: 2.6rem;
+    font-size: 1.3rem;
+    font-variant-numeric: tabular-nums;
+    text-align: right;
+    color: var(--text);
+}
+
+.popup-range {
+    flex-grow: 1;
+    height: 4px;
+    appearance: none;
+    background: var(--accent-soft);
+    border-radius: 999px;
+    outline: none;
+    cursor: pointer;
+}
+
+.popup-range::-webkit-slider-thumb {
+    appearance: none;
+    width: 16px;
+    height: 16px;
+    background: var(--accent);
+    border: 2px solid var(--surface-solid);
+    border-radius: 50%;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.25);
+}
+
+.popup-range::-moz-range-thumb {
+    width: 14px;
+    height: 14px;
+    background: var(--accent);
+    border: 2px solid var(--surface-solid);
+    border-radius: 50%;
+}
+
+.popup-shapes {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 6px;
+}
+
+.popup-shape {
+    display: grid;
+    place-content: center;
+    aspect-ratio: 1;
+    color: var(--text-muted);
+    background: transparent;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    cursor: pointer;
+    transition:
+        color 0.12s ease,
+        background-color 0.12s ease;
+}
+
+.popup-shape svg {
+    display: block;
+    width: 22px;
+    height: 22px;
+}
+
+.popup-shape:hover {
+    color: var(--text);
+    background-color: var(--surface-hover);
+}
+
+.popup-shape[data-active] {
+    color: var(--accent-contrast);
+    background-color: var(--accent);
+    border-color: var(--accent);
+}
+
+.popup-palette {
+    display: grid;
+    grid-template-columns: repeat(8, 1fr);
+    gap: 5px;
+}
+
+.popup-swatch {
+    aspect-ratio: 1;
+    background-color: var(--swatch);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    cursor: pointer;
+    transition: transform 0.1s ease;
+}
+
+.popup-swatch:hover {
+    transform: scale(1.15);
+}
+
+.popup-swatch[data-active] {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+}
+
+.popup-color {
+    width: 100%;
+    height: 34px;
+    padding: 0;
+    background: none;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    cursor: pointer;
+}
+
+.popup-color::-webkit-color-swatch-wrapper {
+    padding: 3px;
+}
+
+.popup-color::-webkit-color-swatch {
+    border: none;
+    border-radius: 5px;
+}
+
+/* ---------------------------------------------------------------- Ajuda */
+
+#hint-container {
+    position: absolute;
+    right: 16px;
+    bottom: 16px;
+    z-index: 2;
+
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 10px;
+}
+
+.hints-toggle {
+    width: 34px;
+    height: 34px;
+    font-size: 1.5rem;
+    font-weight: 600;
+    color: var(--text-muted);
+    background-color: var(--surface);
+    backdrop-filter: blur(14px);
+    border: 1px solid var(--border);
+    border-radius: 50%;
+    box-shadow: var(--shadow);
+    cursor: pointer;
+    transition:
+        color 0.15s ease,
+        background-color 0.15s ease;
+}
+
+.hints-toggle:hover,
+.hints-toggle[data-active] {
+    color: var(--accent-contrast);
+    background-color: var(--accent);
+}
+
+.hints-card {
+    width: 250px;
+    padding: 14px 16px;
+    background-color: var(--surface-solid);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow);
+    animation: popup-in 0.14s ease-out;
+}
+
+.hints-card[hidden] {
+    display: none;
+}
+
+.hints-title {
+    margin-bottom: 4px;
+    font-size: 1.4rem;
+    font-weight: 600;
+}
+
+.hints-group {
+    margin-top: 12px;
+    font-size: 1.05rem;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+}
+
+.hints-list {
+    list-style: none;
+}
+
+.hints-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 3px 0;
+    font-size: 1.25rem;
+}
+
+.hints-label {
+    color: var(--text-muted);
+}
+
+.hints-key {
+    padding: 2px 7px;
+    font-family: ui-monospace, "SFMono-Regular", "Cascadia Code", monospace;
+    font-size: 1.1rem;
+    color: var(--text);
+    background-color: var(--accent-soft);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    white-space: nowrap;
+}
+
+/* ------------------------------------------------------------ Telas curtas */
+
+@media (max-height: 560px) {
+    .hints-card {
+        max-height: 60dvh;
+        overflow-y: auto;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+        animation: none !important;
+        transition: none !important;
+    }
+}

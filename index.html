@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="Um quadro branco infinito para desenhar direto no navegador." />
+    <meta name="theme-color" content="#38316d" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <title>Whiteboard</title>
+    <script>
+        // Aplica o tema antes da primeira pintura, para a tela nao piscar em branco.
+        try {
+            var saved = localStorage.getItem("whiteboard:theme");
+            document.documentElement.dataset.theme =
+                saved === "light" || saved === "dark"
+                    ? saved
+                    : matchMedia("(prefers-color-scheme: dark)").matches
+                      ? "dark"
+                      : "light";
+        } catch (error) {
+            document.documentElement.dataset.theme = "light";
+        }
+    </script>
+</head>
+<body>
+    <div id="container">
+        <canvas id="whiteboard"></canvas>
+        <!-- A barra de ferramentas e o painel de atalhos sao montados pelo TypeScript. -->
+        <aside id="tool-container" aria-label="Ferramentas"></aside>
+        <div id="hint-container"></div>
+    </div>
+    <script type="module" src="/src/main.ts"></script>
+</body>
+</html>
