@@ -86,6 +86,15 @@ export class Cursor extends Tool {
         this.reset();
     }
 
+    /** Dois cliques em cima de um texto reabrem ele para edicao. */
+    public override onDoubleClick(pointer: IPointerInfo): void {
+        const hit = this.board.hitTest(pointer.scene);
+
+        if (hit && hit.kind === "text") {
+            this.board.editText(hit.position, hit);
+        }
+    }
+
     public override onDeactivate(): void {
         this.reset();
     }

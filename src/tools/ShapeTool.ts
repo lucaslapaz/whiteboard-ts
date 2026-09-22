@@ -34,6 +34,7 @@ export class ShapeTool extends Tool {
         const outline = buildShape(shape.value, this.origin, pointer.scene, pointer.constrain);
 
         this.board.setCurrentStroke({
+            kind: "stroke",
             points: outline.points,
             color: lineColor.value,
             lineWidth: lineThickness.value,

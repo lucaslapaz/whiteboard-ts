@@ -1,4 +1,5 @@
-import type { IDrawing, IPoint, ISelectionArea } from "../core/types";
+import { textBaselineOffset, textFont, textLineHeight } from "../core/text";
+import type { IDrawing, IPoint, ISelectionArea, IStroke, IText } from "../core/types";
 import type { Viewport } from "./Viewport";
 
 export interface IBrushPreview {
@@ -75,11 +76,11 @@ export class Renderer {
         this.drawGrid();
 
         for (const drawing of scene.drawings) {
-            this.drawSmoothLine(drawing);
+            this.drawElement(drawing);
         }
 
         if (scene.currentDrawing) {
-            this.drawSmoothLine(scene.currentDrawing);
+            this.drawElement(scene.currentDrawing);
         }
 
         if (scene.selectionArea) {
@@ -101,7 +102,7 @@ export class Renderer {
         this.clear();
 
         for (const drawing of scene.drawings) {
-            this.drawSmoothLine(drawing, false);
+            this.drawElement(drawing, false);
         }
 
         const target = document.createElement("canvas");
@@ -181,7 +182,62 @@ export class Renderer {
         this.ctx.restore();
     }
 
-    private drawSmoothLine(drawing: IDrawing, withGlow = true): void {
+    private drawElement(drawing: IDrawing, withGlow = true): void {
+        if (drawing.kind === "text") {
+            this.drawText(drawing, withGlow);
+        } else {
+            this.drawStroke(drawing, withGlow);
+        }
+    }
+
+    /** Mede o texto com a mesma fonte que vai desenhar, para gravar a caixa dele. */
+    public measureText(lines: string[], fontSize: number): { width: number; height: number } {
+        this.ctx.save();
+        this.ctx.font = textFont(fontSize);
+        const width = lines.reduce((widest, line) => Math.max(widest, this.ctx.measureText(line).width), 0);
+        this.ctx.restore();
+
+        return { width, height: lines.length * textLineHeight(fontSize) };
+    }
+
+    private drawText(text: IText, withGlow: boolean): void {
+        this.ctx.save();
+        this.ctx.font = textFont(text.fontSize);
+        this.ctx.textBaseline = "alphabetic";
+        this.ctx.fillStyle = text.color;
+
+        if (text.selected && withGlow) {
+            this.ctx.shadowColor = this.theme.selectionGlow;
+            this.ctx.shadowBlur = 8;
+        }
+
+        // `position` e o topo da caixa de linha, igual ao `<textarea>`. A linha
+        // de base sai da mesma conta que o CSS faz para centralizar o glifo.
+        const { ascent, descent } = this.fontMetrics(text.fontSize);
+        const lineHeight = textLineHeight(text.fontSize);
+        const baseline = text.position.y + textBaselineOffset(text.fontSize, ascent, descent);
+
+        text.lines.forEach((line, index) => {
+            this.ctx.fillText(line, text.position.x, baseline + index * lineHeight);
+        });
+
+        this.ctx.restore();
+    }
+
+    /** Altura real da fonte, que e o que o CSS usa para montar a caixa de linha. */
+    private fontMetrics(fontSize: number): { ascent: number; descent: number } {
+        this.ctx.save();
+        this.ctx.font = textFont(fontSize);
+        const metrics = this.ctx.measureText("Mg");
+        this.ctx.restore();
+
+        return {
+            ascent: metrics.fontBoundingBoxAscent ?? fontSize * 0.8,
+            descent: metrics.fontBoundingBoxDescent ?? fontSize * 0.2,
+        };
+    }
+
+    private drawStroke(drawing: IStroke, withGlow: boolean): void {
         const { points } = drawing;
 
         if (points.length < 2) {

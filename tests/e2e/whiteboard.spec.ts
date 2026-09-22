@@ -20,7 +20,14 @@ declare global {
     interface Window {
         whiteboard: {
             board: {
-                allDrawings: Array<{ color: string; selected: boolean; points: Array<{ x: number; y: number }> }>;
+                allDrawings: Array<{
+                    kind: "stroke" | "text";
+                    color: string;
+                    selected: boolean;
+                    points: Array<{ x: number; y: number }>;
+                    lines: string[];
+                    position: { x: number; y: number };
+                }>;
                 viewport: { offsetX: number; offsetY: number };
             };
             sharedVariables: { activeTool: { value: string } };
@@ -206,6 +213,138 @@ test("com Shift a linha trava na horizontal, na vertical e na diagonal", async (
         Math.abs(diagonal.to.y - diagonal.from.y),
         5,
     );
+});
+
+/** Escreve na caixa de texto aberta e encerra a edicao. */
+async function typeText(page: Page, value: string): Promise<void> {
+    const editor = page.locator(".text-editor");
+    await editor.waitFor();
+    await editor.fill(value);
+    await page.keyboard.press("Escape");
+    await expect(editor).toHaveCount(0);
+}
+
+test("a ferramenta de texto escreve no quadro", async ({ page }) => {
+    await page.keyboard.press("t");
+    await page.keyboard.press("Escape");
+
+    await clickAt(page, 600, 300);
+    await typeText(page, "Aprovado\nsegunda linha");
+
+    const texts = await page.evaluate(() =>
+        window.whiteboard.board.allDrawings
+            .filter((drawing) => drawing.kind === "text")
+            .map((drawing) => ({ lines: drawing.lines, position: drawing.position })),
+    );
+
+    expect(texts).toHaveLength(1);
+    expect(texts[0].lines).toEqual(["Aprovado", "segunda linha"]);
+    expect(texts[0].position).toEqual({ x: 600, y: 300 });
+});
+
+test("o texto e gravado onde foi digitado, sem subir", async ({ page }) => {
+    await page.keyboard.press("t");
+    await page.keyboard.press("Escape");
+    await clickAt(page, 600, 300);
+
+    const editor = page.locator(".text-editor");
+    await editor.waitFor();
+    await editor.fill("Hxyg");
+
+    // A caixa de digitacao e o texto gravado precisam pintar na mesma altura.
+    const clip = { x: 560, y: 270, width: 300, height: 120 };
+    const editing = await page.screenshot({ clip, scale: "css" });
+    await page.keyboard.press("Escape");
+    await expect(editor).toHaveCount(0);
+    const committed = await page.screenshot({ clip, scale: "css" });
+
+    const rows = await page.evaluate(async ([a, b]) => {
+        const firstInkRow = async (base64: string): Promise<number | null> => {
+            const image = new Image();
+            image.src = "data:image/png;base64," + base64;
+            await image.decode();
+
+            const canvas = document.createElement("canvas");
+            canvas.width = image.width;
+            canvas.height = image.height;
+
+            const context = canvas.getContext("2d")!;
+            context.drawImage(image, 0, 0);
+            const data = context.getImageData(0, 0, canvas.width, canvas.height).data;
+
+            for (let y = 0; y < canvas.height; y++) {
+                for (let x = 0; x < canvas.width; x++) {
+                    const i = (y * canvas.width + x) * 4;
+                    if (data[i] < 120 && data[i + 1] < 120 && data[i + 2] < 140) {
+                        return y;
+                    }
+                }
+            }
+
+            return null;
+        };
+
+        return { editing: await firstInkRow(a), committed: await firstInkRow(b) };
+    }, [editing.toString("base64"), committed.toString("base64")]);
+
+    expect(rows.editing).not.toBeNull();
+    expect(rows.committed).toBeCloseTo(rows.editing as number, -0.4);
+});
+
+test("texto em branco nao vira elemento", async ({ page }) => {
+    await page.keyboard.press("t");
+    await page.keyboard.press("Escape");
+
+    await clickAt(page, 600, 300);
+    await typeText(page, "   ");
+
+    expect((await probe(page)).total).toBe(0);
+});
+
+test("dois cliques na selecao reabrem o texto para editar", async ({ page }) => {
+    await page.keyboard.press("t");
+    await page.keyboard.press("Escape");
+    await clickAt(page, 600, 300);
+    await typeText(page, "antes");
+
+    await page.keyboard.press("v");
+    await page.mouse.dblclick(620, 315);
+    await typeText(page, "depois");
+
+    const texts = await page.evaluate(() =>
+        window.whiteboard.board.allDrawings.filter((drawing) => drawing.kind === "text").map((d) => d.lines),
+    );
+
+    // O texto foi substituido, nao duplicado.
+    expect(texts).toEqual([["depois"]]);
+});
+
+test("o texto e apagavel, movivel e reversivel como qualquer traco", async ({ page }) => {
+    await page.keyboard.press("t");
+    await page.keyboard.press("Escape");
+    await clickAt(page, 600, 300);
+    await typeText(page, "rotulo");
+
+    // move junto com a selecao
+    await page.keyboard.press("v");
+    await clickAt(page, 620, 315);
+    expect((await probe(page)).selected).toBe(1);
+
+    await drag(page, [620, 315], [700, 415]);
+    const moved = await page.evaluate(
+        () => window.whiteboard.board.allDrawings.find((d) => d.kind === "text")!.position,
+    );
+    expect(moved.x).toBeCloseTo(680, 0);
+    expect(moved.y).toBeCloseTo(400, 0);
+
+    // a borracha apaga
+    await page.keyboard.press("e");
+    await drag(page, [700, 415], [710, 415]);
+    expect((await probe(page)).total).toBe(0);
+
+    // e o Ctrl + Z traz de volta
+    await page.keyboard.press("Control+z");
+    expect((await probe(page)).total).toBe(1);
 });
 
 test("clique seleciona um traco e Ctrl + clique soma outros", async ({ page }) => {

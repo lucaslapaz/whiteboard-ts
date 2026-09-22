@@ -5,6 +5,7 @@ import "./styles/main.css";
 import { requireElement } from "./ui/dom";
 import { HintsPanel } from "./ui/HintsPanel";
 import { bindShortcuts, createShortcuts } from "./ui/shortcuts";
+import { TextEditor } from "./ui/TextEditor";
 import { ThemeController } from "./ui/theme";
 import { ToolBar } from "./ui/ToolBar";
 
@@ -15,7 +16,8 @@ function start(): void {
 
     const theme = new ThemeController();
     const sharedVariables = new SharedVariables();
-    const board = new WhiteBoard(canvas, sharedVariables);
+    const textEditor = new TextEditor(requireElement("#container"));
+    const board = new WhiteBoard(canvas, sharedVariables, textEditor);
 
     const toolBar = new ToolBar(toolContainer, sharedVariables, {
         center: () => board.centerView(),

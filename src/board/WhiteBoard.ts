@@ -6,15 +6,36 @@ import {
 } from "../core/geometry";
 import { History } from "../core/History";
 import type { SharedVariables } from "../core/SharedVariables";
+import { cleanTextLines } from "../core/text";
 import { ETools } from "../core/types";
-import type { IDrawing, IPoint, IPointerInfo, ISelectionArea } from "../core/types";
-import { Cursor, Eraser, Hand, Pen, ShapeTool } from "../tools";
+import type { IDrawing, IPoint, IPointerInfo, ISelectionArea, IStroke, IText } from "../core/types";
+import { Cursor, Eraser, Hand, Pen, ShapeTool, TextTool } from "../tools";
 import type { Tool } from "../tools/Tool";
 import { Renderer } from "./Renderer";
 import type { IScene } from "./Renderer";
 import { Viewport } from "./Viewport";
 
 const CLICK_TOLERANCE = 6;
+
+export interface ITextEditorRequest {
+    /** Onde a caixa de digitacao aparece, em pixel da tela. */
+    screen: IPoint;
+    lines: string[];
+    fontSize: number;
+    color: string;
+    onCommit: (value: string) => void;
+    onCancel: () => void;
+}
+
+/**
+ * A caixa de digitacao do texto. O quadro so conhece este contrato; quem monta
+ * o `<textarea>` e a camada de interface.
+ */
+export interface ITextEditor {
+    open(request: ITextEditorRequest): void;
+    close(): void;
+    readonly isOpen: boolean;
+}
 
 /**
  * O quadro em si: guarda os tracos, o historico e a visao, e reparte os eventos
@@ -27,24 +48,30 @@ export class WhiteBoard {
 
     private readonly canvas: HTMLCanvasElement;
     private readonly renderer: Renderer;
+    private readonly textEditor: ITextEditor;
     private readonly tools: Map<ETools, Tool>;
+
+    /** Texto que esta sendo reeditado: some do desenho para nao ficar dobrado. */
+    private editingText: IText | null = null;
 
     private readonly history = new History<IDrawing[]>();
 
     private drawings: IDrawing[] = [];
-    private currentDrawing: IDrawing | null = null;
+    private currentDrawing: IStroke | null = null;
     private selectionArea: ISelectionArea | null = null;
     private pointerScene: IPoint | null = null;
     private frameRequest = 0;
 
-    constructor(canvas: HTMLCanvasElement, sharedVariables: SharedVariables) {
+    constructor(canvas: HTMLCanvasElement, sharedVariables: SharedVariables, textEditor: ITextEditor) {
         this.canvas = canvas;
         this.sharedVariables = sharedVariables;
+        this.textEditor = textEditor;
         this.renderer = new Renderer(canvas, this.viewport);
 
         this.tools = new Map<ETools, Tool>([
             [ETools.Pen, new Pen(this)],
             [ETools.Shape, new ShapeTool(this)],
+            [ETools.Text, new TextTool(this)],
             [ETools.Eraser, new Eraser(this)],
             [ETools.Cursor, new Cursor(this)],
             [ETools.Hand, new Hand(this)],
@@ -61,7 +88,7 @@ export class WhiteBoard {
         return this.drawings;
     }
 
-    public get currentStroke(): IDrawing | null {
+    public get currentStroke(): IStroke | null {
         return this.currentDrawing;
     }
 
@@ -87,7 +114,7 @@ export class WhiteBoard {
     // --- Tracos ------------------------------------------------------------
 
     /** Define o traco em andamento, que aparece na tela mas ainda nao foi gravado. */
-    public setCurrentStroke(drawing: IDrawing | null): void {
+    public setCurrentStroke(drawing: IStroke | null): void {
         this.currentDrawing = drawing;
         this.requestRender();
     }
@@ -121,6 +148,73 @@ export class WhiteBoard {
             this.applyChange(remaining);
         }
 
+        this.requestRender();
+    }
+
+    // --- Texto -------------------------------------------------------------
+
+    /**
+     * Abre a caixa de digitacao. Sem `existing`, escreve um texto novo naquele
+     * ponto; com `existing`, reedita um que ja estava no quadro.
+     */
+    public editText(scene: IPoint, existing: IText | null = null): void {
+        const fontSize = existing?.fontSize ?? this.sharedVariables.fontSize.value;
+        const color = existing?.color ?? this.sharedVariables.lineColor.value;
+        const position = existing ? existing.position : scene;
+
+        this.editingText = existing;
+        this.requestRender();
+
+        this.textEditor.open({
+            screen: this.viewport.toScreen(position),
+            lines: existing ? existing.lines : [],
+            fontSize,
+            color,
+            onCommit: (value) => this.commitText(value, position, fontSize, color, existing),
+            onCancel: () => {
+                this.editingText = null;
+                this.requestRender();
+            },
+        });
+    }
+
+    public get isEditingText(): boolean {
+        return this.textEditor.isOpen;
+    }
+
+    /** Texto em branco nao vira elemento, e reeditar substitui o antigo. */
+    private commitText(
+        value: string,
+        position: IPoint,
+        fontSize: number,
+        color: string,
+        existing: IText | null,
+    ): void {
+        this.editingText = null;
+        const lines = cleanTextLines(value);
+
+        if (!lines && !existing) {
+            this.requestRender();
+            return;
+        }
+
+        const next = existing ? this.drawings.filter((drawing) => drawing !== existing) : [...this.drawings];
+
+        if (lines) {
+            const { width, height } = this.renderer.measureText(lines, fontSize);
+            next.push({
+                kind: "text",
+                position,
+                lines,
+                fontSize,
+                color,
+                width,
+                height,
+                selected: false,
+            });
+        }
+
+        this.applyChange(next);
         this.requestRender();
     }
 
@@ -301,7 +395,10 @@ export class WhiteBoard {
         const radius = this.activeTool?.brushRadius() ?? null;
 
         return {
-            drawings: this.drawings,
+            // O texto em edicao vive no `<textarea>`, nao no canvas.
+            drawings: this.editingText
+                ? this.drawings.filter((drawing) => drawing !== this.editingText)
+                : this.drawings,
             currentDrawing: this.currentDrawing,
             selectionArea: this.selectionArea,
             brush: radius !== null && this.pointerScene ? { center: this.pointerScene, radius } : null,
@@ -324,6 +421,7 @@ export class WhiteBoard {
         this.canvas.addEventListener("pointerup", this.onPointerUp);
         this.canvas.addEventListener("pointercancel", this.onPointerUp);
         this.canvas.addEventListener("pointerleave", this.onPointerLeave);
+        this.canvas.addEventListener("dblclick", this.onDoubleClick);
         this.canvas.addEventListener("wheel", this.onWheel, { passive: false });
         this.canvas.addEventListener("contextmenu", (event) => event.preventDefault());
 
@@ -369,6 +467,10 @@ export class WhiteBoard {
         this.endGesture();
     };
 
+    private onDoubleClick = (event: MouseEvent): void => {
+        this.activeTool?.onDoubleClick(this.describePointer(event));
+    };
+
     private onPointerLeave = (): void => {
         this.pointerScene = null;
         this.requestRender();
@@ -380,7 +482,7 @@ export class WhiteBoard {
         this.pan(-event.deltaX, -event.deltaY);
     };
 
-    private describePointer(event: PointerEvent): IPointerInfo {
+    private describePointer(event: MouseEvent): IPointerInfo {
         const bounding = this.canvas.getBoundingClientRect();
         const screen = { x: event.clientX - bounding.left, y: event.clientY - bounding.top };
 
@@ -390,7 +492,6 @@ export class WhiteBoard {
             button: event.button,
             additive: event.ctrlKey || event.metaKey || event.shiftKey,
             constrain: event.shiftKey,
-            originalEvent: event,
         };
     }
 }

@@ -3,10 +3,12 @@ import { ETools } from "../core/types";
 import { el } from "./dom";
 import { EraserPopUp } from "./EraserPopUp";
 import { icons } from "./icons";
+import type { ColorPalette } from "./ColorPalette";
 import type { InkControls } from "./InkControls";
 import { PenPopUp } from "./PenPopUp";
 import type { PopUp } from "./PopUp";
 import { ShapePopUp } from "./ShapePopUp";
+import { TextPopUp } from "./TextPopUp";
 import { ToolBarButton } from "./ToolBarButton";
 
 export interface IToolBarActions {
@@ -29,6 +31,7 @@ export class ToolBar {
 
     private penPopUp: PenPopUp | null = null;
     private shapePopUp: ShapePopUp | null = null;
+    private textPopUp: TextPopUp | null = null;
     private eraserPopUp: EraserPopUp | null = null;
     private actualPopUp: PopUp | null = null;
 
@@ -50,6 +53,7 @@ export class ToolBar {
         const tools: Array<{ tool: ETools; label: string; icon: string; shortcut: string }> = [
             { tool: ETools.Pen, label: "Caneta", icon: icons.pen, shortcut: "P" },
             { tool: ETools.Shape, label: "Formas", icon: icons.shapes, shortcut: "S" },
+            { tool: ETools.Text, label: "Texto", icon: icons.text, shortcut: "T" },
             { tool: ETools.Eraser, label: "Borracha", icon: icons.eraser, shortcut: "E" },
             { tool: ETools.Cursor, label: "Selecao", icon: icons.cursor, shortcut: "V" },
             { tool: ETools.Hand, label: "Mover o quadro", icon: icons.hand, shortcut: "H" },
@@ -160,6 +164,11 @@ export class ToolBar {
             return this.shapePopUp;
         }
 
+        if (tool === ETools.Text) {
+            this.textPopUp ??= this.createTextPopUp();
+            return this.textPopUp;
+        }
+
         if (tool === ETools.Eraser) {
             this.eraserPopUp ??= this.createEraserPopUp();
             return this.eraserPopUp;
@@ -170,32 +179,27 @@ export class ToolBar {
 
     private createPenPopUp(): PenPopUp {
         const popUp = new PenPopUp(this.container);
-        this.connectInk(popUp.ink);
+        this.connectThickness(popUp.ink);
+        this.connectPalette(popUp.ink.palette);
         return popUp;
     }
 
     private createShapePopUp(): ShapePopUp {
         const popUp = new ShapePopUp(this.container, this.sharedVariables.shape);
-        this.connectInk(popUp.ink);
+        this.connectThickness(popUp.ink);
+        this.connectPalette(popUp.ink.palette);
         return popUp;
     }
 
-    /**
-     * Liga os campos de espessura e cor as variaveis compartilhadas. A caneta e
-     * as formas usam os mesmos valores, entao os dois paineis ficam em sincronia.
-     */
-    private connectInk(ink: InkControls): void {
-        const { lineThickness, lineColor } = this.sharedVariables;
+    private createTextPopUp(): TextPopUp {
+        const popUp = new TextPopUp(this.container);
+        const { fontSize } = this.sharedVariables;
 
-        lineThickness.associateElement(ink.thicknessRange);
-        lineThickness.associateElement(ink.thicknessNumber);
-        lineColor.associateElement(ink.colorInput);
-        lineColor.addListener((color) => ink.highlightSelected(color));
+        fontSize.associateElement(popUp.fontSizeRange);
+        fontSize.associateElement(popUp.fontSizeNumber);
+        this.connectPalette(popUp.palette);
 
-        // A partir da primeira escolha manual, a cor para de seguir o tema.
-        ink.colorInput.addEventListener("input", () => {
-            this.sharedVariables.inkIsDefault = false;
-        });
+        return popUp;
     }
 
     private createEraserPopUp(): EraserPopUp {
@@ -206,6 +210,29 @@ export class ToolBar {
         eraserThickness.associateElement(popUp.thicknessNumber);
 
         return popUp;
+    }
+
+    private connectThickness(ink: InkControls): void {
+        const { lineThickness } = this.sharedVariables;
+
+        lineThickness.associateElement(ink.thicknessRange);
+        lineThickness.associateElement(ink.thicknessNumber);
+    }
+
+    /**
+     * Liga a paleta a cor compartilhada. Caneta, formas e texto desenham com a
+     * mesma cor, entao os paineis ficam em sincronia sozinhos.
+     */
+    private connectPalette(palette: ColorPalette): void {
+        const { lineColor } = this.sharedVariables;
+
+        lineColor.associateElement(palette.colorInput);
+        lineColor.addListener((color) => palette.highlightSelected(color));
+
+        // A partir da primeira escolha manual, a cor para de seguir o tema.
+        palette.colorInput.addEventListener("input", () => {
+            this.sharedVariables.inkIsDefault = false;
+        });
     }
 
     private onWindowPointerDown = (event: PointerEvent): void => {

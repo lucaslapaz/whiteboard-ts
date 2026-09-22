@@ -30,6 +30,7 @@ export class SharedVariables {
     public readonly lineThickness = new Variable<number>(2);
     public readonly lineColor = new Variable<string>(DEFAULT_INK.light);
     public readonly eraserThickness = new Variable<number>(10);
+    public readonly fontSize = new Variable<number>(20);
 
     /**
      * Enquanto o usuario nao escolher uma cor na mao, a caneta acompanha o tema.

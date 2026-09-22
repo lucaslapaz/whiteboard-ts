@@ -19,6 +19,7 @@ export class Pen extends Tool {
         const { lineColor, lineThickness } = this.board.sharedVariables;
 
         this.board.setCurrentStroke({
+            kind: "stroke",
             points: [pointer.scene],
             color: lineColor.value,
             lineWidth: lineThickness.value,

@@ -20,6 +20,8 @@ export abstract class Tool {
 
     public onPointerUp(_pointer: IPointerInfo): void {}
 
+    public onDoubleClick(_pointer: IPointerInfo): void {}
+
     /** Chamado quando outra ferramenta assume, para largar qualquer gesto pela metade. */
     public onDeactivate(): void {}
 

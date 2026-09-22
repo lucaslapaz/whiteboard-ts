@@ -52,6 +52,10 @@ body {
     cursor: default;
 }
 
+#whiteboard[data-tool="text"] {
+    cursor: text;
+}
+
 #whiteboard[data-tool="hand"] {
     cursor: grab;
 }
@@ -443,4 +447,26 @@ body {
         animation: none !important;
         transition: none !important;
     }
+}
+
+/* ---------------------------------------------------- Caixa de texto */
+
+/*
+ * Fica por cima do canvas, sem moldura, com a mesma fonte e a mesma cor do
+ * texto que vai ser desenhado — a impressao e de estar digitando no quadro.
+ * A fonte, o tamanho e a cor sao definidos em codigo, por TextEditor.
+ */
+.text-editor {
+    position: absolute;
+    z-index: 4;
+    margin: 0;
+    padding: 0;
+    border: none;
+    outline: none;
+    background: transparent;
+    overflow: hidden;
+    resize: none;
+    white-space: pre;
+    min-width: 1ch;
+    caret-color: var(--accent);
 }

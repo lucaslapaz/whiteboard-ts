@@ -1,13 +1,13 @@
 # Whiteboard
 
 Um quadro branco infinito para desenhar no navegador: caneta a mao livre, formas
-prontas, borracha, selecao e exportacao em PNG.
+prontas, texto, borracha, selecao e exportacao em PNG.
 
 Sem framework. TypeScript puro, um `<canvas>` 2D e CSS, empacotados pelo
 [Vite](https://vite.dev). O HTML tem so os containers vazios — a barra de
 ferramentas, os paineis e o cartao de atalhos sao montados em codigo.
 
-![O quadro com formas, setas e um traco a mao livre, com o painel de formas aberto](preview.png)
+![Um fluxograma feito no quadro: caixas, losango, setas, um balao de fala com texto e um rabisco a mao livre, com o painel de texto aberto](preview.png)
 
 ## Comecando
 
@@ -35,6 +35,11 @@ curvas quadraticas, entao o traco nao sai serrilhado.
 
 **Formas** cria retangulo, retangulo arredondado, elipse, triangulo, losango,
 balao de fala, linha e seta. Arraste a diagonal para definir o tamanho.
+
+**Texto** abre uma caixa de digitacao no ponto clicado. Enter quebra a linha;
+Esc, Ctrl + Enter ou um clique fora encerram e gravam. Texto em branco e
+descartado. Com a ferramenta de selecao, dois cliques em cima de um texto
+reabrem ele para editar.
 
 **Borracha** apaga o traco inteiro que estiver debaixo do circulo — nao apaga
 pedacinhos.
@@ -64,6 +69,7 @@ Segurando `Shift` durante o arrasto de uma forma:
 | ---------- | ------------------------ |
 | `P`        | Caneta                   |
 | `S`        | Formas                   |
+| `T`        | Texto                    |
 | `E`        | Borracha                 |
 | `V`        | Selecao                  |
 | `H`        | Mover o quadro           |
@@ -74,13 +80,13 @@ Segurando `Shift` durante o arrasto de uma forma:
 | Setas      | Mover o quadro           |
 | `F`        | Centralizar o desenho    |
 | `Ctrl + S` | Exportar PNG             |
-| `T`        | Tema claro / escuro      |
+| `D`        | Tema claro / escuro      |
 | `?`        | Mostrar todos os atalhos |
 
 O tema acompanha o sistema ate voce escolher um, e a escolha fica salva no
 `localStorage`.
 
-![O mesmo quadro no tema escuro, com uma forma selecionada e o cartao de atalhos aberto](preview-dark.png)
+![O mesmo tipo de quadro no tema escuro, com uma elipse e seu rotulo selecionados e o cartao de atalhos aberto](preview-dark.png)
 
 ## Como o codigo esta organizado
 
@@ -89,11 +95,12 @@ index.html              a pagina, so com os containers vazios
 src/
   main.ts               liga as pecas e inicia o app
   core/
-    types.ts            IDrawing, ISelectionArea, ETools, IPointerInfo
+    types.ts            IStroke, IText, IDrawing, ETools, IPointerInfo
     Variable.ts         valor observavel que se liga a elementos da pagina
-    SharedVariables.ts  estado compartilhado (ferramenta, forma, cor, espessura)
-    geometry.ts         distancias, colisao com o traco, area de selecao
+    SharedVariables.ts  estado compartilhado (ferramenta, forma, cor, tamanho)
+    geometry.ts         colisao, area de selecao e deslocamento dos elementos
     shapes.ts           contorno das formas prontas
+    text.ts             fonte e entrelinha, compartilhadas canvas / editor
     History.ts          pilha de desfazer por instantaneos
   board/
     WhiteBoard.ts       estado do quadro e roteamento dos eventos do ponteiro
@@ -101,13 +108,15 @@ src/
     Viewport.ts         deslocamento da visao e conversao de coordenadas
   tools/
     Tool.ts             classe base das ferramentas
-    Pen.ts ShapeTool.ts Eraser.ts Cursor.ts Hand.ts
+    Pen.ts ShapeTool.ts TextTool.ts Eraser.ts Cursor.ts Hand.ts
   ui/
     ToolBar.ts          barra flutuante
     ToolBarButton.ts    botao da barra
     PopUp.ts            base dos paineis de ajuste
-    PenPopUp.ts ShapePopUp.ts EraserPopUp.ts
-    InkControls.ts      espessura e cor, compartilhados por caneta e formas
+    PenPopUp.ts ShapePopUp.ts TextPopUp.ts EraserPopUp.ts
+    ColorPalette.ts     amostras de cor, usadas pelos tres paineis
+    InkControls.ts      espessura mais a paleta, para caneta e formas
+    TextEditor.ts       a caixa de digitacao que fica sobre o canvas
     HintsPanel.ts       cartao de atalhos
     shortcuts.ts        teclado
     theme.ts            claro / escuro
@@ -117,17 +126,22 @@ src/
     main.css            layout e componentes
   assets/icons/         os SVG da barra, em currentColor
 tests/
-  unit/                 geometria, formas, historico e Variable (Vitest)
+  unit/                 geometria, formas, texto, historico e Variable (Vitest)
   e2e/                  o quadro inteiro pelo navegador (Playwright)
 ```
 
 ### As quatro ideias que sustentam o resto
 
-**Tudo no quadro e uma lista de pontos.** Um rabisco a mao e um balao de fala
-sao o mesmo `IDrawing`; muda so como os pontos foram gerados e como sao ligados
-(`smooth`, `closed`). Por isso apagar, selecionar, mover, desfazer e exportar
-funcionam em qualquer coisa desenhada, sem nenhum caso especial. Criar uma forma
-nova e escrever uma funcao que devolve pontos em `core/shapes.ts`.
+**Todo elemento do quadro e um `IDrawing`.** O tipo e uma uniao de duas formas
+de existir: `IStroke`, uma lista de pontos, e `IText`. Um rabisco a mao e um
+balao de fala sao os dois o mesmo `IStroke`; muda so como os pontos foram
+gerados e como sao ligados (`smooth`, `closed`) — criar uma forma nova e
+escrever uma funcao que devolve pontos em `core/shapes.ts`.
+
+O que diferencia os dois tipos fica confinado em `core/geometry.ts`, em quatro
+funcoes: colisao com um ponto, colisao com o retangulo de selecao, deslocamento
+e limites. O quadro so chama essas funcoes, entao apagar, selecionar, mover,
+desfazer e exportar funcionam igual para texto e para traco.
 
 **`Variable<T>` e o observavel da casa.** Um valor que aparece na tela e que
 outras partes precisam acompanhar vira um `Variable`: `associateElement` liga o
@@ -155,6 +169,11 @@ desenho sem paleta duplicada no TypeScript.
   funcionam do mesmo jeito.
 - O PNG exportado sai sem a grade, sem o brilho de selecao e com o fundo
   preenchido — so o desenho.
+- O texto e digitado num `<textarea>` de verdade posicionado sobre o canvas, e
+  so vira desenho quando a edicao termina. Sai de graca cursor, selecao, colar e
+  teclado virtual. Em troca, a fonte e a entrelinha precisam ser identicas dos
+  dois lados: ficam em `core/text.ts`, e o canvas repete a conta de entrelinha
+  que o CSS faz, senao o texto pularia alguns pixels ao ser gravado.
 
 ## Testes
 
@@ -164,7 +183,7 @@ npm run test:e2e   # navegador
 ```
 
 Os testes de unidade cobrem o que e logica pura: geometria, geracao das formas,
-a pilha de desfazer e o `Variable`.
+metricas de texto, a pilha de desfazer e o `Variable`.
 
 Os de ponta a ponta sobem o servidor sozinhos e dirigem o quadro por mouse e
 teclado de verdade. Eles leem o estado por `window.whiteboard`, que `src/main.ts`

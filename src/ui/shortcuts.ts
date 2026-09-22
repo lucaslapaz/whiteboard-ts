@@ -14,7 +14,7 @@ export interface IShortcut {
     label: string;
     group: string;
     run: () => void;
-    /** Variacoes da mesma linha da ajuda (as setas e o WASD), que nao se repetem no painel. */
+    /** Variacoes da mesma linha da ajuda (as outras setas), que nao se repetem no painel. */
     hidden?: boolean;
 }
 
@@ -35,6 +35,7 @@ export function createShortcuts(context: IShortcutContext): IShortcut[] {
     return [
         { combos: ["p"], display: "P", label: "Caneta", group: "Ferramentas", run: selectTool(ETools.Pen) },
         { combos: ["s"], display: "S", label: "Formas", group: "Ferramentas", run: selectTool(ETools.Shape) },
+        { combos: ["t"], display: "T", label: "Texto", group: "Ferramentas", run: selectTool(ETools.Text) },
         { combos: ["e"], display: "E", label: "Borracha", group: "Ferramentas", run: selectTool(ETools.Eraser) },
         { combos: ["v"], display: "V", label: "Selecao", group: "Ferramentas", run: selectTool(ETools.Cursor) },
         { combos: ["h"], display: "H", label: "Mover o quadro", group: "Ferramentas", run: selectTool(ETools.Hand) },
@@ -65,8 +66,8 @@ export function createShortcuts(context: IShortcutContext): IShortcut[] {
             },
         },
 
-        // As letras viraram atalho de ferramenta, entao o WASD original saiu e
-        // sobraram as setas (mais a roda do mouse e a ferramenta mao).
+        // As letras viraram atalho de ferramenta, entao sobraram as setas
+        // (mais a roda do mouse e a ferramenta mao).
         {
             combos: ["arrowleft"],
             display: "Setas",
@@ -86,7 +87,7 @@ export function createShortcuts(context: IShortcutContext): IShortcut[] {
             group: "Quadro",
             run: () => board.exportPNG(),
         },
-        { combos: ["t"], display: "T", label: "Tema claro / escuro", group: "Quadro", run: () => theme.toggle() },
+        { combos: ["d"], display: "D", label: "Tema claro / escuro", group: "Quadro", run: () => theme.toggle() },
         { combos: ["?", "shift+?"], display: "?", label: "Mostrar os atalhos", group: "Quadro", run: toggleHints },
     ];
 }
